@@ -8,7 +8,7 @@ data_dir = os.path.join(real_dir,'data')
 print(real_dir)
 img_path = r'/disk/ljli/PycharmProjects/darknet-with-opencv/darknet-master/build/darknet/x64/data/obj'
 filenames = glob.glob(os.path.join(img_path, '*.txt'))
-dust_count = [0] * 3 # [6616, 5671, 3540]
+dust_count = [0] * 3 # [6616, 5671, 3540] = 15,827
 for filename in filenames:
     print(filename)
     with open(filename) as f:
