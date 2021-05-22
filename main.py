@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import glob
+from tqdm import tqdm
 import os
 import cv2 as cv
 import torch
@@ -8,12 +9,20 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import numpy as np
 from DustNet import *
 from DustDataLoader import *
 
+gpus = [3]  # 使用哪几个GPU进行训练，这里选择0号GPU
+cuda_gpu = torch.cuda.is_available()  # 判断GPU是否存在可用
+device = torch.device('cuda:3')
+print('cuda_gpu:', cuda_gpu)
+print(device)
+
+
 real_path = os.path.realpath(__file__)
 real_dir = real_path[:real_path.rfind('/')]
-data_dir = os.path.join(real_dir,'data')
+data_dir = os.path.join(real_dir, 'data')
 print(data_dir)
 
 # os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -26,11 +35,9 @@ transform = transforms.Compose(
 
 classes = ('low dust', 'medium dust', 'high dust')
 
-# get some random training images
-dataiter = iter(trainloader)
-images, labels = dataiter.next()
-
 net = DustNet()
+if(cuda_gpu):
+    net.to(device)
 
 ########################################################################
 # 3. Define a Loss function and optimizer
@@ -49,28 +56,53 @@ optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 # We simply have to loop over our data iterator, and feed the inputs to the
 # network and optimize.
 
-for epoch in range(2):  # loop over the dataset multiple times
+for epoch in tqdm(range(100)):  # loop over the dataset multiple times
 
     running_loss = 0.0
-    for i, data in enumerate(dust_dataloader, 1):
+    for i, data in enumerate(dust_train_dataloader, 1):
         # get the inputs
+
         inputs, labels = data
+        inputs = inputs.to(device)
+        labels = labels.to(device)
 
         # zero the parameter gradients
         optimizer.zero_grad()
 
         # forward + backward + optimize
-        output_class, output_reg = net(inputs)
-        loss = crossEntropyLoss(output_class, labels) + mseLoss()
+        output_class = net(inputs)
+
+        a = np.array(np.argmax(output_class.cpu().detach().numpy(), axis=1))
+        b = np.array(labels.cpu().detach().numpy())
+        print(f'i: {i} acc: {np.sum(a == b) / len(labels)}')
+        # print('labels.shape', labels.shape)
+        # print('output_class.shape', output_class.shape)
+        loss = crossEntropyLoss(output_class, labels)
         loss.backward()
         optimizer.step()
 
         # print statistics
         running_loss += loss.item()
-        if i % 2000 == 1999:  # print every 2000 mini-batches
+        if i == 4:  # print every 2000 mini-batches
             print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, i + 1, running_loss / 2000))
+                  (epoch + 1, i, running_loss / 4))
             running_loss = 0.0
+            i = 1
+            with torch.no_grad():
+                acc = [0, 0]
+                for data in dust_valid_dataloader:
+                    inputs, labels = data
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
+                    output_class = net(inputs)
+                    output_class = output_class.cpu()
+                    a = np.array(np.argmax(output_class, axis=1))
+                    b = np.array(labels.cpu())
+                    # print(a.shape, b.shape)
+                    acc[0] += np.sum(a == b)
+                    acc[1] += len(labels)
+                print(f'valid acc: {acc[0]/acc[1]}')
+
 
 print('Finished Training')
 
