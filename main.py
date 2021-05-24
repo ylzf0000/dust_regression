@@ -39,27 +39,20 @@ net = DustNet()
 if(cuda_gpu):
     net.to(device)
 
-########################################################################
-# 3. Define a Loss function and optimizer
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Let's use a Classification Cross-Entropy loss and SGD with momentum.
-
 crossEntropyLoss = nn.CrossEntropyLoss()
 mseLoss = nn.MSELoss()
-optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-
-########################################################################
-# 4. Train the network
-# ^^^^^^^^^^^^^^^^^^^^
-#
-# This is when things start to get interesting.
-# We simply have to loop over our data iterator, and feed the inputs to the
-# network and optimize.
+optimizer = optim.SGD(net.parameters(), lr=0.001,
+                      momentum=0.9, weight_decay=0.0001)
+# optimizer = optim.Adam(net.parameters(), lr=0.001, weight_decay=0)
 
 for epoch in tqdm(range(100)):  # loop over the dataset multiple times
 
     running_loss = 0.0
-    for i, data in enumerate(dust_train_dataloader, 1):
+    i = 0
+    correct = 0
+    total = 0
+    for data in dust_train_dataloader:
+        i += 1
         # get the inputs
 
         inputs, labels = data
@@ -74,7 +67,8 @@ for epoch in tqdm(range(100)):  # loop over the dataset multiple times
 
         a = np.array(np.argmax(output_class.cpu().detach().numpy(), axis=1))
         b = np.array(labels.cpu().detach().numpy())
-        print(f'i: {i} acc: {np.sum(a == b) / len(labels)}')
+        correct += np.sum(a == b)
+        total += len(labels)
         # print('labels.shape', labels.shape)
         # print('output_class.shape', output_class.shape)
         loss = crossEntropyLoss(output_class, labels)
@@ -83,9 +77,12 @@ for epoch in tqdm(range(100)):  # loop over the dataset multiple times
 
         # print statistics
         running_loss += loss.item()
-        if i == 4:  # print every 2000 mini-batches
+        if i == 10:  # print every 2000 mini-batches
             print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, i, running_loss / 4))
+                  (epoch + 1, i, running_loss / 10))
+            print(f'i: {i} acc: {correct / total}')
+            correct = 0
+            total = 0
             running_loss = 0.0
             i = 1
             with torch.no_grad():
