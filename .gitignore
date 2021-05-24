@@ -113,5 +113,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 data/
+data_train/
+data_valid/
+data_test/
 .vscode/
 *.jpg
